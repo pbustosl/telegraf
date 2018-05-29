@@ -92,6 +92,35 @@ func TestRedis_ParseMetrics(t *testing.T) {
 		"used_cpu_sys_children":          float64(0.00),
 		"used_cpu_user_children":         float64(0.00),
 		"keyspace_hitrate":               float64(0.50),
+		"cmdstat_del_usec_per_call":       float64(7.89),
+		"cmdstat_expire_usec_per_call":    float64(1.55),
+		"cmdstat_get_usec_per_call":       float64(4.35),
+		"cmdstat_info_usec_per_call":      float64(145.92),
+		"cmdstat_mget_usec_per_call":      float64(7.72),
+		"cmdstat_mset_usec_per_call":      float64(7.03),
+		"cmdstat_select_usec_per_call":    float64(1.47),
+		"cmdstat_setex_usec_per_call":     float64(5.15),
+		"cmdstat_setnx_usec_per_call":     float64(4.42),
+		"cmdstat_skip_odd_metrics_calls":  int64(7734),
+		"cmdstat_skip_odd_metrics_usec":   int64(1128518),
+		"cmdstat_del_calls":               int64(28393),
+		"cmdstat_del_usec":                int64(224118),
+		"cmdstat_expire_calls":            int64(524193),
+		"cmdstat_expire_usec":             int64(811227),
+		"cmdstat_get_calls":               int64(18708243),
+		"cmdstat_get_usec":                int64(81317810),
+		"cmdstat_info_calls":              int64(7734),
+		"cmdstat_info_usec":               int64(1128518),
+		"cmdstat_mget_calls":              int64(3136449),
+		"cmdstat_mget_usec":               int64(24200188),
+		"cmdstat_mset_calls":              int64(118074),
+		"cmdstat_mset_usec":               int64(830158),
+		"cmdstat_select_calls":            int64(252265),
+		"cmdstat_select_usec":             int64(371753),
+		"cmdstat_setex_calls":             int64(1342574),
+		"cmdstat_setex_usec":              int64(6917848),
+		"cmdstat_setnx_calls":             int64(12),
+		"cmdstat_setnx_usec":              int64(53),
 		"redis_version":                  "2.8.9",
 	}
 
@@ -117,6 +146,29 @@ func TestRedis_ParseMetrics(t *testing.T) {
 	acc.AssertContainsTaggedFields(t, "redis", fields, tags)
 	acc.AssertContainsTaggedFields(t, "redis_keyspace", keyspaceFields, keyspaceTags)
 }
+
+func TestRedis_ErrorCmdstatOddMetric(t *testing.T) {
+	var acc testutil.Accumulator
+	tags := map[string]string{"host": "redis.net"}
+	rdr := bufio.NewReader(strings.NewReader(testOutputCmdstatOddMetric))
+
+	err := gatherInfoOutput(rdr, &acc, tags)
+	require.NoError(t, err)
+	assert.EqualError(t, acc.FirstError(),  "unknown Commandstats line metric: usec_per_call")
+}
+
+const testOutputCmdstatOddMetric = `# Commandstats
+cmdstat_get:calls=18708243,usec=81317810,usec_per_call=4.35
+cmdstat_setnx:calls=12,usec=53,usec_per_call=4.42
+cmdstat_setex:calls=1342574,usec=6917848,usec_per_call=5.15
+cmdstat_del:calls=28393,usec=224118,usec_per_call=7.89
+cmdstat_mget:calls=3136449,usec=24200188,usec_per_call=7.72
+cmdstat_mset:calls=118074,usec=830158,usec_per_call=7.03
+cmdstat_select:calls=252265,usec=371753,usec_per_call=1.47
+cmdstat_expire:calls=524193,usec=811227,usec_per_call=1.55
+cmdstat_info:calls=7734,usec=1128518,usec_per_call=145.92
+cmdstat_skip_odd_metrics:calls=7734,usec=1128518,usec_per_call
+`
 
 const testOutput = `# Server
 redis_version:2.8.9
@@ -186,6 +238,18 @@ keyspace_misses:1
 pubsub_channels:0
 pubsub_patterns:0
 latest_fork_usec:0
+
+# Commandstats
+cmdstat_get:calls=18708243,usec=81317810,usec_per_call=4.35
+cmdstat_setnx:calls=12,usec=53,usec_per_call=4.42
+cmdstat_setex:calls=1342574,usec=6917848,usec_per_call=5.15
+cmdstat_del:calls=28393,usec=224118,usec_per_call=7.89
+cmdstat_mget:calls=3136449,usec=24200188,usec_per_call=7.72
+cmdstat_mset:calls=118074,usec=830158,usec_per_call=7.03
+cmdstat_select:calls=252265,usec=371753,usec_per_call=1.47
+cmdstat_expire:calls=524193,usec=811227,usec_per_call=1.55
+cmdstat_info:calls=7734,usec=1128518,usec_per_call=145.92
+cmdstat_skip_odd_metrics:calls=7734,usec=1128518,usec_per_call
 
 # Replication
 role:master

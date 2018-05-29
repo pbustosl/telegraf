@@ -34,7 +34,7 @@ type RedisClient struct {
 }
 
 func (r *RedisClient) Info() *redis.StringCmd {
-	return r.client.Info()
+	return r.client.Info("all")
 }
 
 func (r *RedisClient) BaseTags() map[string]string {
@@ -169,7 +169,6 @@ func (r *Redis) gatherServer(client Client, acc telegraf.Accumulator) error {
 	rdr := strings.NewReader(info)
 	return gatherInfoOutput(rdr, acc, client.BaseTags())
 }
-
 // gatherInfoOutput gathers
 func gatherInfoOutput(
 	rdr io.Reader,
@@ -205,6 +204,29 @@ func gatherInfoOutput(
 			if name != "lru_clock" && name != "uptime_in_seconds" && name != "redis_version" {
 				continue
 			}
+		}
+
+		if section == "Commandstats" {
+			// #cmdstat_get:calls=63102137,usec=166854619,usec_per_call=2.64
+			tmp := strings.Split(line, ":")
+			tmp_metrics := strings.Split(tmp[1], ",")
+			for _, element := range tmp_metrics {
+				mdata := strings.Split(element, "=")
+				if len(mdata) != 2 {
+					acc.AddError(fmt.Errorf("unknown Commandstats line metric: %s", element))
+					continue
+				}
+				field_name := tmp[0] + "_" + mdata[0]
+				if ival, err := strconv.ParseInt(mdata[1], 10, 64); err == nil {
+					fields[field_name] = ival
+				} else if fval, err := strconv.ParseFloat(mdata[1], 64); err == nil {
+					fields[field_name] = fval
+				} else {
+					fields[field_name] = mdata[1]
+				}
+
+			}
+			continue
 		}
 
 		if strings.HasPrefix(name, "master_replid") {
