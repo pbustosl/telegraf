@@ -225,7 +225,7 @@ type FlushStats struct {
 type ConnectionStats struct {
 	Current      int64 `bson:"current"`
 	Available    int64 `bson:"available"`
-	TotalCreated int64 `bson:"totalCreated"`
+	TotalCreated int64 `bson:"total_created"`
 }
 
 // DurTiming stores information related to journaling.
@@ -289,8 +289,9 @@ type OpcountStats struct {
 
 // MetricsStats stores information related to metrics
 type MetricsStats struct {
-	TTL    *TTLStats    `bson:"ttl"`
-	Cursor *CursorStats `bson:"cursor"`
+	TTL      *TTLStats      `bson:"ttl"`
+	Cursor   *CursorStats   `bson:"cursor"`
+	Document *DocumentStats `bson:"document"`
 }
 
 // TTLStats stores information related to documents with a ttl index.
@@ -303,6 +304,14 @@ type TTLStats struct {
 type CursorStats struct {
 	TimedOut int64            `bson:"timedOut"`
 	Open     *OpenCursorStats `bson:"open"`
+}
+
+// DocumentStats stores information related to document metrics.
+type DocumentStats struct {
+	Deleted  int64 `bson:"deleted"`
+	Inserted int64 `bson:"inserted"`
+	Returned int64 `bson:"returned"`
+	Updated  int64 `bson:"updated"`
 }
 
 // OpenCursorStats stores information related to open cursor metrics
@@ -457,6 +466,12 @@ type StatLine struct {
 	TimedOutC                   int64
 	NoTimeoutC, PinnedC, TotalC int64
 
+	// Document fields
+	DeletedD, InsertedD, ReturnedD, UpdatedD int64
+
+	// Connection fields
+	CurrentC, AvailableC, TotalCreatedC int64
+
 	// Collection locks (3.0 mmap only)
 	CollectionLocks *CollectionLockStatus
 
@@ -584,6 +599,11 @@ func NewStatLine(oldMongo, newMongo MongoStatus, key string, all bool, sampleSec
 		Faults:    -1,
 	}
 
+	// set connection info
+	returnVal.CurrentC = newStat.Connections.Current
+	returnVal.AvailableC = newStat.Connections.Available
+	returnVal.TotalCreatedC = newStat.Connections.TotalCreated
+
 	// set the storage engine appropriately
 	if newStat.StorageEngine != nil && newStat.StorageEngine["name"] != "" {
 		returnVal.StorageEngine = newStat.StorageEngine["name"]
@@ -612,6 +632,12 @@ func NewStatLine(oldMongo, newMongo MongoStatus, key string, all bool, sampleSec
 				returnVal.PinnedC = diff(newStat.Metrics.Cursor.Open.Pinned, oldStat.Metrics.Cursor.Open.Pinned, sampleSecs)
 				returnVal.TotalC = diff(newStat.Metrics.Cursor.Open.Total, oldStat.Metrics.Cursor.Open.Total, sampleSecs)
 			}
+		}
+		if newStat.Metrics.Document != nil {
+			returnVal.DeletedD = newStat.Metrics.Document.Deleted
+			returnVal.InsertedD = newStat.Metrics.Document.Inserted
+			returnVal.ReturnedD = newStat.Metrics.Document.Returned
+			returnVal.UpdatedD = newStat.Metrics.Document.Updated
 		}
 	}
 
